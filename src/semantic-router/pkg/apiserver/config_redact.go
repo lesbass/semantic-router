@@ -17,6 +17,10 @@ var sensitiveAssignmentPattern = regexp.MustCompile(
 	`(?i)((?:["']?(?:api[_-]?key|access[_-]?key|password|auth[_-]?password|client[_-]?secret|private[_-]?key|secret)["']?)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,}\]]+)`,
 )
 
+var environmentReferencePattern = regexp.MustCompile(
+	`^\$(?:\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)$`,
+)
+
 // scrubSecretsInErrorMessage removes plaintext credential assignments from
 // management API error messages so parse/deploy failures cannot leak secrets.
 func scrubSecretsInErrorMessage(message string) string {
@@ -63,7 +67,11 @@ func redactSensitiveConfigValue(value interface{}) interface{} {
 		out := make(map[string]interface{}, len(typed))
 		for key, nested := range typed {
 			if isSensitiveConfigKey(key) {
-				out[key] = redactedConfigValue
+				if isPureEnvironmentReference(nested) {
+					out[key] = nested
+				} else {
+					out[key] = redactedConfigValue
+				}
 				continue
 			}
 			out[key] = redactSensitiveConfigValue(nested)
@@ -78,6 +86,11 @@ func redactSensitiveConfigValue(value interface{}) interface{} {
 	default:
 		return value
 	}
+}
+
+func isPureEnvironmentReference(value interface{}) bool {
+	text, ok := value.(string)
+	return ok && environmentReferencePattern.MatchString(strings.TrimSpace(text))
 }
 
 func isSensitiveConfigKey(key string) bool {

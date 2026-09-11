@@ -87,6 +87,11 @@ func TestRedactSensitiveConfigValue(t *testing.T) {
 							"api_key_env": "OPENAI_API_KEY",
 							"password":    "db-pass",
 						},
+						map[string]interface{}{
+							"api_key":       "${MODEL_API_KEY}",
+							"password":      "$DB_PASSWORD",
+							"client_secret": "${CLIENT_SECRET:-literal-fallback}",
+						},
 					},
 				},
 			},
@@ -114,6 +119,16 @@ func TestRedactSensitiveConfigValue(t *testing.T) {
 	}
 	if ref["api_key_env"] != "OPENAI_API_KEY" {
 		t.Fatalf("api_key_env should remain visible, got %v", ref["api_key_env"])
+	}
+	referenceRef := refs[1].(map[string]interface{})
+	if referenceRef["api_key"] != "${MODEL_API_KEY}" {
+		t.Fatalf("environment api_key reference should remain reusable, got %v", referenceRef["api_key"])
+	}
+	if referenceRef["password"] != "$DB_PASSWORD" {
+		t.Fatalf("environment password reference should remain reusable, got %v", referenceRef["password"])
+	}
+	if referenceRef["client_secret"] != redactedConfigValue {
+		t.Fatalf("environment reference with literal fallback must be redacted, got %v", referenceRef["client_secret"])
 	}
 	if redacted["tokens_per_unit"] != 100 {
 		t.Fatalf("tokens_per_unit should not be redacted")
@@ -161,7 +176,7 @@ func TestConfigGetRedactsSecretsForViewerAndOperator(t *testing.T) {
 			}
 			mux := server.setupRoutes()
 
-			req := httptest.NewRequest(http.MethodGet, "/config/router", nil)
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/config", nil)
 			req.Header.Set("Authorization", "Bearer "+token)
 			rr := httptest.NewRecorder()
 			mux.ServeHTTP(rr, req)
@@ -214,7 +229,7 @@ func TestClassifierInfoRedactsSecretsWithoutSecretView(t *testing.T) {
 	}
 	mux := server.setupRoutes()
 
-	req := httptest.NewRequest(http.MethodGet, "/info/classifier", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/inventory/classifier", nil)
 	req.Header.Set("Authorization", "Bearer viewer-token")
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
@@ -222,7 +237,7 @@ func TestClassifierInfoRedactsSecretsWithoutSecretView(t *testing.T) {
 		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
 	}
 	if strings.Contains(rr.Body.String(), canary) {
-		t.Fatalf("/info/classifier leaked credential for viewer: %s", rr.Body.String())
+		t.Fatalf("/api/v1/inventory/classifier leaked credential for viewer: %s", rr.Body.String())
 	}
 	if !strings.Contains(rr.Body.String(), redactedConfigValue) {
 		t.Fatalf("expected redacted placeholder for password field, got %s", rr.Body.String())
@@ -252,7 +267,7 @@ func TestAdminCanViewSecretsInClassifierInfo(t *testing.T) {
 	}
 	mux := server.setupRoutes()
 
-	req := httptest.NewRequest(http.MethodGet, "/info/classifier", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/inventory/classifier", nil)
 	req.Header.Set("Authorization", "Bearer admin-token")
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
@@ -326,7 +341,7 @@ func TestConfigGetRedactedBodyIsJSON(t *testing.T) {
 		},
 	}
 	mux := server.setupRoutes()
-	req := httptest.NewRequest(http.MethodGet, "/config/router", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/config", nil)
 	req.Header.Set("Authorization", "Bearer viewer-token")
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)

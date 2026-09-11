@@ -96,5 +96,5 @@ def test_openclaw_install_docs_use_the_validate_config_option() -> None:
     for path in (OPENCLAW_SKILL_PATH, OPENCLAW_INSTALL_DOC_PATH):
         content = path.read_text(encoding="utf-8")
 
-        assert "vllm-sr validate --config config.yaml" in content
-        assert "vllm-sr validate config.yaml" not in content
+        assert "vllm-sr config validate --config config.yaml" in content
+        assert "vllm-sr config validate config.yaml" not in content

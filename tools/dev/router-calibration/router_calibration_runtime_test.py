@@ -254,6 +254,27 @@ class RecipeScopedProbeRuntimeTest(unittest.TestCase):
             ["workflow:tool_workstreams", "direct:baseline"],
         )
 
+    def test_dsl_is_only_exposed_where_it_is_consumed(self) -> None:
+        parser = router_calibration_loop.build_parser()
+        commands = next(
+            action for action in parser._actions if action.dest == "command"
+        )
+
+        deploy_options = {
+            option
+            for action in commands.choices["deploy"]._actions
+            for option in action.option_strings
+        }
+        self.assertNotIn("--dsl", deploy_options)
+
+        run_dsl = next(
+            action
+            for action in commands.choices["run"]._actions
+            if "--dsl" in action.option_strings
+        )
+        self.assertIn("local validation", run_dsl.help)
+        self.assertNotIn("archive", run_dsl.help)
+
     def test_tag_summary_groups_cross_cutting_robustness_axes(self) -> None:
         summaries = router_calibration_manifest.summarize_tag_results(
             [

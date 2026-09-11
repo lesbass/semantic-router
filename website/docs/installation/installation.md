@@ -133,7 +133,7 @@ the local log directory as sensitive.
 If you already have a complete canonical config:
 
 ```bash
-vllm-sr validate --config config.yaml
+vllm-sr config validate --config config.yaml
 vllm-sr serve --config config.yaml
 ```
 
